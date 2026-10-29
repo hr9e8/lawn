@@ -1,7 +1,7 @@
 import { ConvexError } from "convex/values";
 import { components } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { MutationCtx, QueryCtx } from "./_generated/server";
+import { env, MutationCtx, QueryCtx } from "./_generated/server";
 
 export type TeamPlan = "basic" | "pro";
 
@@ -54,7 +54,16 @@ export function hasActiveTeamSubscriptionStatus(status: string | undefined | nul
 
 type BillingCtx = QueryCtx | MutationCtx;
 
+export function isBillingEnabled() {
+  return env.BILLING_ENABLED !== "false";
+}
+
+export function requireBillingEnabled() {
+  if (!isBillingEnabled()) throw new ConvexError("Billing is disabled for this deployment.");
+}
+
 export async function getTeamSubscriptionByOrgId(ctx: BillingCtx, teamId: Id<"teams">) {
+  if (!isBillingEnabled()) return null;
   return await ctx.runQuery(components.stripe.public.getSubscriptionByOrgId, {
     orgId: teamId,
   });
@@ -71,9 +80,11 @@ export async function getTeamSubscriptionState(ctx: BillingCtx, teamId: Id<"team
 
   const subscriptionPlan = resolvePlanFromStripePriceId(subscription?.priceId);
   const plan = subscriptionPlan ?? normalizeStoredTeamPlan(team.plan);
-  const hasActiveSubscription = hasActiveTeamSubscriptionStatus(subscription?.status);
+  const billingEnabled = isBillingEnabled();
+  const hasActiveSubscription =
+    !billingEnabled || hasActiveTeamSubscriptionStatus(subscription?.status);
 
-  return { team, subscription, plan, hasActiveSubscription };
+  return { team, subscription, plan, hasActiveSubscription, billingEnabled };
 }
 
 export async function getTeamStorageUsedBytes(ctx: BillingCtx, teamId: Id<"teams">) {

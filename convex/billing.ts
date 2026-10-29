@@ -11,6 +11,7 @@ import {
   getTeamSubscriptionState,
   hasActiveTeamSubscriptionStatus,
   normalizeStoredTeamPlan,
+  requireBillingEnabled,
   resolvePlanFromStripePriceId,
   TEAM_PLAN_MONTHLY_PRICE_USD,
   TEAM_PLAN_STORAGE_LIMIT_BYTES,
@@ -77,6 +78,7 @@ export const createSubscriptionCheckout = action({
     url: v.union(v.string(), v.null()),
   }),
   handler: async (ctx, args): Promise<{ sessionId: string; url: string | null }> => {
+    requireBillingEnabled();
     const identity = await getIdentity(ctx);
     const team = await ctx.runQuery(api.teams.get, { teamId: args.teamId });
 
@@ -169,6 +171,7 @@ export const reconcileTeamSubscription = action({
     status: v.union(v.literal("synced"), v.literal("no_customer"), v.literal("not_found")),
   }),
   handler: async (ctx, args) => {
+    requireBillingEnabled();
     const team = await ctx.runQuery(api.teams.get, { teamId: args.teamId });
 
     if (!team) {
@@ -242,6 +245,7 @@ export const createCustomerPortalSession = action({
     url: v.string(),
   }),
   handler: async (ctx, args): Promise<{ url: string }> => {
+    requireBillingEnabled();
     const team = await ctx.runQuery(api.teams.get, { teamId: args.teamId });
 
     if (!team) {
@@ -280,6 +284,7 @@ export const updateTeamSubscriptionPlan = action({
     subscriptionStatus: v.string(),
   }),
   handler: async (ctx, args): Promise<{ plan: TeamPlan; subscriptionStatus: string }> => {
+    requireBillingEnabled();
     const team = await ctx.runQuery(api.teams.get, { teamId: args.teamId });
 
     if (!team) {
@@ -386,6 +391,7 @@ export const getTeamBilling = query({
     storageLimitBytes: v.number(),
     storageUsedBytes: v.number(),
     hasActiveSubscription: v.boolean(),
+    billingEnabled: v.boolean(),
     subscriptionStatus: v.union(v.string(), v.null()),
     stripeCustomerId: v.union(v.string(), v.null()),
     stripeSubscriptionId: v.union(v.string(), v.null()),
@@ -402,10 +408,13 @@ export const getTeamBilling = query({
 
     return {
       plan: subscriptionState.plan,
-      monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD[subscriptionState.plan],
+      monthlyPriceUsd: subscriptionState.billingEnabled
+        ? TEAM_PLAN_MONTHLY_PRICE_USD[subscriptionState.plan]
+        : 0,
       storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES[subscriptionState.plan],
       storageUsedBytes,
       hasActiveSubscription: subscriptionState.hasActiveSubscription,
+      billingEnabled: subscriptionState.billingEnabled,
       subscriptionStatus: subscription?.status ?? subscriptionState.team.billingStatus ?? null,
       stripeCustomerId:
         subscriptionState.team.stripeCustomerId ?? subscription?.stripeCustomerId ?? null,
@@ -414,7 +423,7 @@ export const getTeamBilling = query({
       stripePriceId: subscription?.priceId ?? subscriptionState.team.stripePriceId ?? null,
       currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
       role: membership.role,
-      canManageBilling: membership.role === "owner",
+      canManageBilling: subscriptionState.billingEnabled && membership.role === "owner",
     };
   },
 });

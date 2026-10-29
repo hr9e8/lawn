@@ -155,11 +155,16 @@ export default function TeamSettingsPage() {
   const plan = billing?.plan ?? normalizeTeamPlan(team.plan);
   const planConfig = BILLING_PLANS[plan];
   const hasActiveSubscription = billing?.hasActiveSubscription ?? false;
+  const billingEnabled = billing?.billingEnabled ?? true;
   const subscriptionStatus = billing?.subscriptionStatus ?? "not_subscribed";
   const isTrialing = subscriptionStatus === "trialing";
   const hasPortalAccess = isOwner && Boolean(billing?.stripeCustomerId);
-  const currentPlanLabel = hasActiveSubscription ? planConfig.label : "Unpaid";
-  const canDeleteTeam = isOwner && !hasActiveSubscription;
+  const currentPlanLabel = !billingEnabled
+    ? "Self-hosted"
+    : hasActiveSubscription
+      ? planConfig.label
+      : "Unpaid";
+  const canDeleteTeam = isOwner && (!billingEnabled || !hasActiveSubscription);
 
   const storageUsed = billing?.storageUsedBytes ?? 0;
   const storageLimit = planConfig.storageLimitBytes;
@@ -178,7 +183,7 @@ export default function TeamSettingsPage() {
   };
 
   const handleDeleteTeam = async () => {
-    if (hasActiveSubscription) {
+    if (billingEnabled && hasActiveSubscription) {
       setBillingError(
         "Cancel the team's active subscription in billing before deleting this team.",
       );
@@ -394,77 +399,85 @@ export default function TeamSettingsPage() {
                 Plans
               </h2>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {(Object.keys(BILLING_PLANS) as BillingPlan[]).map((planId) => {
-                  const config = BILLING_PLANS[planId];
-                  const isCurrentPlan = planId === plan && hasActiveSubscription;
-                  const isUpgradePlan =
-                    isOwner && hasActiveSubscription && PLAN_RANK[planId] > PLAN_RANK[plan];
-                  return (
-                    <div
-                      key={planId}
-                      className={`border-2 p-5 transition-colors ${
-                        isCurrentPlan
-                          ? "border-[#2d5a2d] bg-[#2d5a2d] text-[#f0f0e8]"
-                          : "border-[#1a1a1a] bg-[#f0f0e8]"
-                      }`}
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <p
-                          className={`text-sm font-bold tracking-wider uppercase ${isCurrentPlan ? "text-[#f0f0e8]" : "text-[#888]"}`}
-                        >
-                          {config.label}
-                        </p>
-                        {isCurrentPlan && <Check className="h-4 w-4 text-[#7cb87c]" />}
-                      </div>
-                      <p
-                        className={`text-3xl font-black ${isCurrentPlan ? "text-[#f0f0e8]" : "text-[#1a1a1a]"}`}
-                      >
-                        ${config.monthlyPriceUsd}
-                        <span
-                          className={`text-sm font-bold ${isCurrentPlan ? "text-[#7cb87c]" : "text-[#888]"}`}
-                        >
-                          /mo
-                        </span>
-                      </p>
+              {!billingEnabled && (
+                <p className="border-2 border-[#1a1a1a] p-5 text-sm text-[#888]">
+                  Billing is disabled. You can create projects and upload videos without a
+                  subscription, within your team’s storage limit.
+                </p>
+              )}
+              {billingEnabled && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {(Object.keys(BILLING_PLANS) as BillingPlan[]).map((planId) => {
+                    const config = BILLING_PLANS[planId];
+                    const isCurrentPlan = planId === plan && hasActiveSubscription;
+                    const isUpgradePlan =
+                      isOwner && hasActiveSubscription && PLAN_RANK[planId] > PLAN_RANK[plan];
+                    return (
                       <div
-                        className={`mt-3 space-y-0.5 text-sm ${isCurrentPlan ? "text-[#c8e0c8]" : "text-[#888]"}`}
+                        key={planId}
+                        className={`border-2 p-5 transition-colors ${
+                          isCurrentPlan
+                            ? "border-[#2d5a2d] bg-[#2d5a2d] text-[#f0f0e8]"
+                            : "border-[#1a1a1a] bg-[#f0f0e8]"
+                        }`}
                       >
-                        <p>{config.seats} seats</p>
-                        <p>{formatBytes(config.storageLimitBytes)} storage</p>
+                        <div className="mb-3 flex items-center justify-between">
+                          <p
+                            className={`text-sm font-bold tracking-wider uppercase ${isCurrentPlan ? "text-[#f0f0e8]" : "text-[#888]"}`}
+                          >
+                            {config.label}
+                          </p>
+                          {isCurrentPlan && <Check className="h-4 w-4 text-[#7cb87c]" />}
+                        </div>
+                        <p
+                          className={`text-3xl font-black ${isCurrentPlan ? "text-[#f0f0e8]" : "text-[#1a1a1a]"}`}
+                        >
+                          ${config.monthlyPriceUsd}
+                          <span
+                            className={`text-sm font-bold ${isCurrentPlan ? "text-[#7cb87c]" : "text-[#888]"}`}
+                          >
+                            /mo
+                          </span>
+                        </p>
+                        <div
+                          className={`mt-3 space-y-0.5 text-sm ${isCurrentPlan ? "text-[#c8e0c8]" : "text-[#888]"}`}
+                        >
+                          <p>{config.seats} seats</p>
+                          <p>{formatBytes(config.storageLimitBytes)} storage</p>
+                        </div>
+                        {isOwner && !hasActiveSubscription && (
+                          <Button
+                            variant={planId === "pro" ? "primary" : "default"}
+                            className="mt-4 w-full"
+                            disabled={isCheckingOutPlan !== null || isChangingPlan !== null}
+                            onClick={() => void handleStartCheckout(planId)}
+                          >
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            {isCheckingOutPlan === planId
+                              ? "Redirecting..."
+                              : `Start ${config.label} Trial`}
+                          </Button>
+                        )}
+                        {isUpgradePlan && (
+                          <Button
+                            variant="primary"
+                            className="mt-4 w-full"
+                            disabled={isCheckingOutPlan !== null || isChangingPlan !== null}
+                            onClick={() => void handleChangePlan(planId)}
+                          >
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            {isChangingPlan === planId
+                              ? "Upgrading..."
+                              : `Upgrade to ${config.label}`}
+                          </Button>
+                        )}
                       </div>
-                      {isOwner && !hasActiveSubscription && (
-                        <Button
-                          variant={planId === "pro" ? "primary" : "default"}
-                          className="mt-4 w-full"
-                          disabled={isCheckingOutPlan !== null || isChangingPlan !== null}
-                          onClick={() => void handleStartCheckout(planId)}
-                        >
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          {isCheckingOutPlan === planId
-                            ? "Redirecting..."
-                            : `Start ${config.label} Trial`}
-                        </Button>
-                      )}
-                      {isUpgradePlan && (
-                        <Button
-                          variant="primary"
-                          className="mt-4 w-full"
-                          disabled={isCheckingOutPlan !== null || isChangingPlan !== null}
-                          onClick={() => void handleChangePlan(planId)}
-                        >
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          {isChangingPlan === planId
-                            ? "Upgrading..."
-                            : `Upgrade to ${config.label}`}
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
-              {hasPortalAccess && (
+              {billingEnabled && hasPortalAccess && (
                 <Button
                   variant="outline"
                   className="mt-4 w-full"
@@ -483,7 +496,7 @@ export default function TeamSettingsPage() {
                 <p className="mt-3 text-sm font-bold text-[#2d5a2d]">{billingNotice}</p>
               )}
 
-              {!hasActiveSubscription && (
+              {billingEnabled && !hasActiveSubscription && (
                 <p className="mt-3 text-sm text-[#888]">
                   An active subscription is required to create projects and upload videos. Eligible
                   teams receive a {TEAM_TRIAL_DAYS}-day trial before billing starts.
