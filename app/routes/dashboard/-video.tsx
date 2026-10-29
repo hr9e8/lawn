@@ -385,23 +385,33 @@ export default function VideoPage() {
   const playbackUrl = muxPlaybackSource?.url ?? null;
   const isLoadingPlayback = loadingPlaybackVideoId === resolvedVideoId;
   const activePlaybackLoadError =
-    playbackLoadError?.videoId === resolvedVideoId && playbackLoadError.playbackId === muxPlaybackId
+    playbackLoadError !== null &&
+    playbackLoadError.videoId === resolvedVideoId &&
+    playbackLoadError.playbackId === muxPlaybackId
       ? playbackLoadError.message
       : null;
   const playbackRequestAttempt =
-    playbackRequest?.videoId === resolvedVideoId && playbackRequest.playbackId === muxPlaybackId
+    playbackRequest !== null &&
+    playbackRequest.videoId === resolvedVideoId &&
+    playbackRequest.playbackId === muxPlaybackId
       ? playbackRequest.attempt
       : 0;
   const activePlaybackErrorAttempt =
-    playbackLoadError?.videoId === resolvedVideoId && playbackLoadError.playbackId === muxPlaybackId
+    playbackLoadError !== null &&
+    playbackLoadError.videoId === resolvedVideoId &&
+    playbackLoadError.playbackId === muxPlaybackId
       ? playbackLoadError.attempt
       : 0;
   const processingFailed = video?.status === "failed";
   const preferredSource =
-    sourcePreference?.videoId === resolvedVideoId ? sourcePreference.source : "mux720";
+    sourcePreference !== null && sourcePreference.videoId === resolvedVideoId
+      ? sourcePreference.source
+      : "mux720";
   const originalPlaybackFailed = !processingFailed && failedOriginalVideoId === resolvedVideoId;
   const originalPlaybackRequestAttempt =
-    originalPlaybackRequest?.videoId === resolvedVideoId ? originalPlaybackRequest.attempt : 0;
+    originalPlaybackRequest !== null && originalPlaybackRequest.videoId === resolvedVideoId
+      ? originalPlaybackRequest.attempt
+      : 0;
   const originalPlaybackUrl = selectDashboardOriginalPlaybackUrl({
     videoId: resolvedVideoId,
     attempt: originalPlaybackRequestAttempt,
@@ -413,11 +423,13 @@ export default function VideoPage() {
     hasOriginalFile: Boolean(video?.s3Key),
   });
   const isLoadingOriginalPlayback =
-    loadingOriginalPlaybackRequest?.videoId === resolvedVideoId &&
+    loadingOriginalPlaybackRequest !== null &&
+    loadingOriginalPlaybackRequest.videoId === resolvedVideoId &&
     loadingOriginalPlaybackRequest.attempt === originalPlaybackRequestAttempt;
   const activeOriginalPlaybackLoadError =
     shouldRequestOriginalPlayback &&
-    originalPlaybackLoadError?.videoId === resolvedVideoId &&
+    originalPlaybackLoadError !== null &&
+    originalPlaybackLoadError.videoId === resolvedVideoId &&
     originalPlaybackLoadError.attempt === originalPlaybackRequestAttempt
       ? originalPlaybackLoadError.message
       : null;
